@@ -25,6 +25,8 @@ source-repository head
 library
   exposed-modules:
       Lib
+      Solver
+      Tree
   other-modules:
       Paths_proskell
   hs-source-dirs:
