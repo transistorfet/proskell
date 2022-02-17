@@ -34,10 +34,9 @@ exampleProgramQ3 = Compound "reverse" [(Cons (Atom "cat") (Cons (Atom "dog") (Co
 
 
 exampleProgram4 = "\
-\  highest(X, [X|[]]).\n\
-\  highest(X, [X|Xs]) :- highest(Y, Xs), X >= Y.\n\
-\  highest(Y, [X|Xs]) :- highest(Y, Xs), X < Y.\n"
-exampleProgramQ4 = "highest(X, [1, 8, 904, 234, 42])."
+\       member(X, [X|Xs]).\n\
+\       member(X, [Y|Xs]) :- member(X, Xs).\n"
+exampleProgramQ4 = "member(cat, [thing, cat, stuff])."
 
 exampleProgram5 = "\
 \       female(marge).\n\
@@ -54,11 +53,11 @@ exampleProgramQ5 = "father(X, bart)."
 
 parseAndSolve :: IO ()
 parseAndSolve
-  = case parseClauseList exampleProgram5 of
+  = case parseClauseList exampleProgram4 of
       Nothing -> putStrLn "Parse Error"
       Just clauses ->
         let db = makeDatabase clauses in
-          case parseTerm exampleProgramQ5 of
+          case parseTerm exampleProgramQ4 of
             Nothing -> putStrLn "Query Parse Error"
             Just (query, _) -> do
               putStrLn (show clauses)

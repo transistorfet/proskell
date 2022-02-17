@@ -69,18 +69,20 @@ expectToken token input
     checkToken (Just (next, remain)) | next == token = Just remain
     checkToken _ = Nothing
 
-
-parseTermList :: String -> Maybe ([Term], String)
-parseTermList input
-  = do
-      (term, remain) <- parseTerm input
-      case expectToken Comma remain of
-        Just remain -> do
-          (list, remain) <- parseTermList remain
-          return $ (term:list, remain)
-        Nothing ->
-          Just ([term], remain)
-
+parseList :: String -> Maybe (Term, String)
+parseList input
+  = case getToken input of
+      Just (Comma, remain) -> parseList remain
+      Just (CloseSquare, remain) -> Just (EmptyList, remain)
+      Just (VerticalBar, remain) -> do
+        (term, remain) <- parseTerm remain
+        remain <- expectToken CloseSquare remain
+        return (term, remain)
+      Just _ -> do
+        (term, remain) <- parseTerm input
+        (list, remain) <- parseList remain
+        return (Cons term list, remain)
+      Nothing -> Nothing
 
 parseTerm :: String -> Maybe (Term, String)
 parseTerm input
@@ -94,11 +96,26 @@ parseTerm input
               (list, remain) <- parseTermList next_rem
               remain <- expectToken CloseBracket remain
               return $ (Compound w list, remain)
+          else if isNumber (head w) then
+            Just (Number (read w :: Int), remain)
           else if isUpperCase (head w) then
             Just (Variable w, remain)
           else
             Just (Atom w, remain)
+        OpenSquare -> parseList remain
         _ -> Nothing
+
+
+parseTermList :: String -> Maybe ([Term], String)
+parseTermList input
+  = do
+      (term, remain) <- parseTerm input
+      case expectToken Comma remain of
+        Just remain -> do
+          (list, remain) <- parseTermList remain
+          return $ (term:list, remain)
+        Nothing ->
+          Just ([term], remain)
 
 
 
