@@ -39,6 +39,7 @@ exampleProgram4 = "\
 exampleProgramQ4 = "member(cat, [thing, cat, stuff])."
 
 exampleProgram5 = "\
+\ % an example\n\
 \       female(marge).\n\
 \       female(lise).\n\
 \       male(homer).\n\
@@ -51,13 +52,21 @@ exampleProgram5 = "\
 exampleProgramQ5 = "father(X, bart)."
 
 
+exampleProgram6 = "\
+\       highest(X, [X|[]]).\n\
+\       highest(X, [X|Xs]) :- highest(Y, Xs), X >= Y.\n\
+\       highest(Y, [X|Xs]) :- highest(Y, Xs), X < Y.\n"
+
+exampleProgramQ6 = "highest(X, [1, 8, 904, 234, 42])."
+
+
 parseAndSolve :: IO ()
 parseAndSolve
-  = case parseClauseList exampleProgram4 of
+  = case parseClauseList exampleProgram6 of
       Nothing -> putStrLn "Parse Error"
       Just clauses ->
         let db = makeDatabase clauses in
-          case parseTerm exampleProgramQ4 of
+          case parseTerm exampleProgramQ6 of
             Nothing -> putStrLn "Query Parse Error"
             Just (query, _) -> do
               putStrLn (show clauses)

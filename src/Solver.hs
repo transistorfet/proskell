@@ -3,6 +3,7 @@ module Solver where
 import Debug.Trace
 
 import Tree
+import Builtins
 
 data Database = Database {
   clauses :: [Clause]
@@ -154,9 +155,15 @@ solve db query
 
 solveFrom :: Database -> Int -> Term -> Maybe Result
 solveFrom db i query
-  = trace ("Solve " ++ (show query)) $ do
-      r <- searchClauses (incDatabase db) i (drop i (clauses db)) query
-      trace ("Result " ++ (show (term r)) ++ " with " ++ (show (bindings r))) $ return r
+  = trace ("Solve " ++ (show query)) $
+      case checkBuiltin query of
+        Just t -> printResult $ Just $ makeResult (t, []) i
+        _ -> printResult $ searchClauses (incDatabase db) i (drop i (clauses db)) query
+  where
+    printResult result
+      = case result of
+          Just r -> trace ("Result " ++ (show (term r)) ++ " with " ++ (show (bindings r))) $ Just r
+          Nothing -> trace "Failed" Nothing
 
 
 searchClauses :: Database -> Int -> [Clause] -> Term -> Maybe Result
@@ -169,11 +176,11 @@ searchClauses db i (c : cs) query
 
 solveClause :: Database -> Int -> Clause -> Term -> Maybe Result
 solveClause db i (Fact term) query
-  = trace ("Try fact " ++ (show (Fact term))) $ do
+  = do
       r <- unify term query
       return $ makeResult r i
 solveClause db i (Rule lhs rhs) query
-  = trace ("Try rule " ++ (show (Rule lhs rhs))) $ do
+  = do
       (t1, b1) <- unify (renameTerm (show (iteration db)) lhs) query
       r2 <- solveExpr db 0 (substituteExpr b1 (renameExpr (show (iteration db)) rhs))
       nb <- mergeBindings b1 (bindings r2)
@@ -195,5 +202,4 @@ solveConjunct db i t1 t2
             return $ makeResult (term r2, nb) (atRule r2)
         Nothing ->
           solveConjunct db ((atRule r1) + 1) t1 t2
-
 

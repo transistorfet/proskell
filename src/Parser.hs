@@ -30,6 +30,12 @@ isWord :: Char -> Bool
 isWord c
   = c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_'
 
+isOperator :: Char -> Bool
+isOperator c
+  = elem c [';', ':', '=', '>', '<', '+', '-', '*', '\\', '/', '!', '#', '$', '?', '@', '^']
+
+operators = [",", "=", "\\=", ">", ">=", "<", "<=", "+", "-", "is"]
+
 
 takeUntil :: (Char -> Bool) -> String -> (String, String)
 takeUntil f [] = ([], [])
@@ -55,11 +61,19 @@ getToken (c:cs)
       ',' -> Just (Comma, cs)
       '.' -> Just (Period, cs)
       ':' -> if (head cs) == '-' then Just (Horn, (tail cs)) else Nothing
+      '%' ->
+        let (_, remain) = takeUntil (\c -> c /= '\n') cs
+        in getToken remain
       c ->
-        if isWord c
-        then let (word, remain) = takeUntil isWord (c:cs)
+        if isWord c then
+          let (word, remain) = takeUntil isWord (c:cs)
           in Just (Word word, remain)
-        else Nothing -- TODO this is temporary, infix operators and such aren't parsed
+        else if isOperator c then
+          let (word, remain) = takeUntil isOperator (c:cs)
+          in Just (Word word, remain)
+        else
+          Nothing -- TODO this is temporary, infix operators and such aren't parsed
+
 
 expectToken :: Token -> String -> Maybe String
 expectToken token input
@@ -68,6 +82,7 @@ expectToken token input
     checkToken :: Maybe (Token, String) -> Maybe String
     checkToken (Just (next, remain)) | next == token = Just remain
     checkToken _ = Nothing
+
 
 parseList :: String -> Maybe (Term, String)
 parseList input
@@ -84,10 +99,20 @@ parseList input
         return (Cons term list, remain)
       Nothing -> Nothing
 
+
 parseTerm :: String -> Maybe (Term, String)
 parseTerm input
   = do
       (token, remain) <- getToken input
+      (term, remain) <- parseToken token remain
+      case checkOperator remain of
+        Just (operator, remain) -> do
+          (rhs, remain) <- parseTerm remain
+          return (Compound operator [term, rhs], remain)
+        Nothing -> return (term, remain)
+  where
+
+    parseToken token remain =
       case token of
         Word w -> do
           (next, next_rem) <- getToken remain
@@ -104,6 +129,16 @@ parseTerm input
             Just (Atom w, remain)
         OpenSquare -> parseList remain
         _ -> Nothing
+
+    checkOperator remain =
+      case getToken remain of
+        Just (Word w, next_rem) ->
+          if elem w operators then
+            Just (w, next_rem)
+          else
+            Nothing
+        _ ->
+          Nothing
 
 
 parseTermList :: String -> Maybe ([Term], String)
