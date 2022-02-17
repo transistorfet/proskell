@@ -2,12 +2,16 @@ module Lib
   ( mainFunc
   ) where
 
+import Debug.Trace
+
 
 data Term =
     Atom String
   | Compound String [Term]
   | Variable String
   | Number Int
+  | EmptyList
+  | Cons Term Term
 
 data Expr =
     Term Term
@@ -23,6 +27,8 @@ instance Show Term where
   show (Compound n terms) = "Compound(" ++ n ++ ", " ++ (show terms) ++ ")"
   show (Variable n) = "Variable " ++ n
   show (Number n) = "Number " ++ (show n)
+  show EmptyList = "EmptyList"
+  show (Cons t1 t2) = "Cons(" ++ (show t1) ++ ", " ++ (show t2) ++ ")"
 
 instance Show Expr where
   show (Term term) = show term
@@ -36,15 +42,9 @@ instance Show Clause where
 
 
 
-data Binding = Binding {
-  name :: String
-, value :: Term
-}
-
-type Bindings = [Binding]
-
 data Database = Database {
   clauses :: [Clause]
+, iteration :: Int
 }
 
 data Result = Result {
@@ -52,6 +52,26 @@ data Result = Result {
 , bindings :: Bindings
 , atRule :: Int
 }
+
+data Binding = Binding {
+  name :: String
+, value :: Term
+}
+
+type Bindings = [Binding]
+
+makeDatabase :: [Clause] -> Database
+makeDatabase clauses
+  = Database {
+      clauses = clauses
+    , iteration = 0
+    }
+
+incDatabase :: Database -> Database
+incDatabase db
+  = db {
+      iteration = (iteration db) + 1
+    }
 
 bindTerm :: String -> Term -> Binding
 bindTerm name term
@@ -100,6 +120,8 @@ mergeBindings (a:as) bs
 substituteTerm :: Bindings -> Term -> Term
 substituteTerm bs (Compound n terms)
   = Compound n (map (\t -> substituteTerm bs t) terms)
+substituteTerm bs (Cons t1 t2)
+  = Cons (substituteTerm bs t1) (substituteTerm bs t2)
 substituteTerm bs (Variable n)
   = findBinding bs n
   where
@@ -118,6 +140,7 @@ substituteExpr bs (Conjunct e1 e2)
 
 renameTerm :: String -> Term -> Term
 renameTerm tag (Compound n terms) = Compound n (map (\t -> renameTerm tag t) terms)
+renameTerm tag (Cons t1 t2) = Cons (renameTerm tag t1) (renameTerm tag t2)
 renameTerm tag (Variable n) = Variable (n ++ tag)
 renameTerm tag t = t
 
@@ -133,12 +156,20 @@ unify (Number n1) (Number n2) | n1 == n2
   = Just (Number n1, [])
 unify (Variable n1) (Variable n2) | n1 == n2
   = Just (Variable n1, [])
-unify (Compound n1 subs1) (Compound n2 subs2) | n1 == n2
-  = unifyList subs1 subs2 >>= (\(list, bindings) -> Just (Compound n1 list, bindings))
 unify (Variable name) term
   = Just (term, [bindTerm name term])
 unify term (Variable name)
   = Just (term, [bindTerm name term])
+unify (Compound n1 subs1) (Compound n2 subs2) | n1 == n2
+  = unifyList subs1 subs2 >>= (\(list, bindings) -> Just (Compound n1 list, bindings))
+unify EmptyList EmptyList
+  = Just (EmptyList, [])
+unify (Cons a1 a2) (Cons b1 b2)
+  = do
+      (t1, r1) <- unify a1 b1
+      (t2, r2) <- unify a2 b2
+      nb <- mergeBindings r1 r2
+      return $ (Cons t1 t2, nb)
 unify _ _
   = Nothing
 
@@ -164,7 +195,9 @@ solve db query
 
 solveFrom :: Database -> Int -> Term -> Maybe Result
 solveFrom db i query
-  = searchClauses db i (drop i (clauses db)) query
+  = trace ("Solve " ++ (show query)) $ do
+      r <- searchClauses (incDatabase db) i (drop i (clauses db)) query
+      trace ("Result " ++ (show (term r)) ++ " with " ++ (show (bindings r))) $ return r
 
 
 searchClauses :: Database -> Int -> [Clause] -> Term -> Maybe Result
@@ -177,13 +210,13 @@ searchClauses db i (c : cs) query
 
 solveClause :: Database -> Int -> Clause -> Term -> Maybe Result
 solveClause db i (Fact term) query
-  = do
+  = trace ("Try fact " ++ (show (Fact term))) $ do
       r <- unify term query
       return $ makeResult r i
 solveClause db i (Rule lhs rhs) query
-  = do
-      (t1, b1) <- unify lhs query
-      r2 <- solveExpr db 0 rhs
+  = trace ("Try rule " ++ (show (Rule lhs rhs))) $ do
+      (t1, b1) <- unify (renameTerm (show (iteration db)) lhs) query
+      r2 <- solveExpr db 0 (substituteExpr b1 (renameExpr (show (iteration db)) rhs))
       nb <- mergeBindings b1 (bindings r2)
       return $ makeResult ((substituteTerm nb t1), nb) i
 
@@ -217,15 +250,30 @@ exampleProgram = [
   , Fact (Compound "parent" [(Atom "homer"), (Atom "lisa")])
   , Rule (Compound "father" [(Variable "X"), (Variable "Y")]) (Conjunct (Term (Compound "parent" [(Variable "X"), (Variable "Y")])) (Term (Compound "male" [(Variable "X")])))
   ]
+exampleProgramQ = (Compound "father" [(Variable "X"), (Atom "bart")])
+
+exampleProgram2 = [
+    Fact (Compound "test" [EmptyList])
+  , Rule (Compound "test" [Cons (Variable "X") (Variable "Xs")]) (Term (Compound "test" [(Variable "Xs")]))
+  ]
+exampleProgramQ2 = (Compound "test" [Cons (Atom "cat") (Cons (Atom "thing") (Cons (Atom "stuff") EmptyList))])
+
+exampleProgram3 = [
+    Rule (Compound "reverse" [Variable "X", Variable "Y"]) (Term (Compound "reverse" [Variable "X", Variable "Y", EmptyList]))
+  , Fact (Compound "reverse" [EmptyList, Variable "Z", Variable "Z"])
+  , Rule (Compound "reverse" [Cons (Variable "H") (Variable "T"), Variable "Z", Variable "Acc"]) (Term (Compound "reverse" [Variable "T", Variable "Z", Cons (Variable "H") (Variable "Acc")]))
+  ]
+exampleProgramQ3 = Compound "reverse" [(Cons (Atom "cat") (Cons (Atom "dog") (Cons (Atom "bird") EmptyList))), Variable "X"]
+
 
 mainFunc :: IO ()
 mainFunc
   = do
     -- putStrLn (show exampleProgram)
     -- putStrLn (show $ mergeBindings [bindTerm "X" (Atom "person")] [bindTerm "Y" (Atom "thing")])
-    putStrLn $ show $ substituteTerm ([bindTerm "X" (Atom "person")]) (Compound "parent" [(Variable "X")])
-    let db = Database { clauses = exampleProgram } in
-      let query = (Compound "father" [(Variable "X"), (Atom "bart")]) in
+    -- putStrLn $ show $ substituteTerm ([bindTerm "X" (Atom "person")]) (Compound "parent" [(Variable "X")])
+    let db = makeDatabase exampleProgram3 in
+      let query = exampleProgramQ3 in
       case solve db query of
         Just result -> do
           putStrLn (show (term result))
