@@ -177,7 +177,7 @@ searchClauses db i (c : cs) query
 solveClause :: Database -> Int -> Clause -> Term -> Maybe Result
 solveClause db i (Fact term) query
   = do
-      r <- unify term query
+      r <- unify (renameTerm (show (iteration db)) term) query
       return $ makeResult r i
 solveClause db i (Rule lhs rhs) query
   = do
