@@ -26,6 +26,8 @@ runBuiltin name args
 builtins = [
     ("true/0", builtinTrue)
   , ("</2", builtinLessThan)
+  , (">/2", builtinGreaterThan)
+  , ("<=/2", builtinLessThanEqual)
   , (">=/2", builtinGreaterThanEqual)
   ]
 
@@ -39,9 +41,21 @@ builtinLessThan args
       (Number a, Number b) -> if a < b then Just (Atom "true") else Nothing
       _ -> Nothing
 
+builtinGreaterThan :: [Term] -> Maybe Term
+builtinGreaterThan args
+  = case (head args, head (tail args)) of
+      (Number a, Number b) -> if a > b then Just (Atom "true") else Nothing
+      _ -> Nothing
+
 builtinGreaterThanEqual :: [Term] -> Maybe Term
 builtinGreaterThanEqual args
   = case (head args, head (tail args)) of
       (Number a, Number b) -> if a >= b then Just (Atom "true") else Nothing
+      _ -> Nothing
+
+builtinLessThanEqual :: [Term] -> Maybe Term
+builtinLessThanEqual args
+  = case (head args, head (tail args)) of
+      (Number a, Number b) -> if a <= b then Just (Atom "true") else Nothing
       _ -> Nothing
 

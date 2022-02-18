@@ -132,13 +132,8 @@ parseTerm input
 
     checkOperator remain =
       case getToken remain of
-        Just (Word w, next_rem) ->
-          if elem w operators then
-            Just (w, next_rem)
-          else
-            Nothing
-        _ ->
-          Nothing
+        Just (Word w, next_rem) | elem w operators -> Just (w, next_rem)
+        _ -> Nothing
 
 
 parseTermList :: String -> Maybe ([Term], String)

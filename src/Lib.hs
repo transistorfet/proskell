@@ -59,22 +59,38 @@ exampleProgram6 = "\
 
 exampleProgramQ6 = "highest(X, [1, 8, 904, 234, 42])."
 
+exampleProgram7 = "\
+\    append([], Ys, Ys).\n\
+\    append([X|Xs], Ys, [X|Zs]) :- append(Xs, Ys, Zs).\n\
+\    pivot(X, [], [], []).\n\
+\    pivot(Pivot, [Head|Tail], [Head|LessOrEqualThan], GreaterThan) :- Pivot >= Head, pivot(Pivot, Tail, LessOrEqualThan, GreaterThan).\n\
+\    pivot(Pivot, [Head|Tail], LessOrEqualThan, [Head|GreaterThan]) :- pivot(Pivot, Tail, LessOrEqualThan, GreaterThan).\n\
+\    quicksort([], []).\n\
+\    quicksort([Head|Tail], Sorted) :- pivot(Head, Tail, List1, List2), quicksort(List1, SortedList1), quicksort(List2, SortedList2), append(SortedList1, [Head|SortedList2], Sorted).\n"
+
+exampleProgramQ7 = "quicksort([1, 8, 904, 234, 42], Sorted)."
+
+exampleProgram8 = "\
+\        append([], Ys, Ys).\n\
+\        append([X|Xs], Ys, [X|Zs]) :- append(Xs, Ys, Zs).\n"
+
+exampleProgramQ8 = "append([thing, stuff, cat], [more, cat, stuff], Zs)."
+
 
 parseAndSolve :: IO ()
 parseAndSolve
-  = case parseClauseList exampleProgram6 of
+  = case parseClauseList exampleProgram8 of
       Nothing -> putStrLn "Parse Error"
       Just clauses ->
         let db = makeDatabase clauses in
-          case parseTerm exampleProgramQ6 of
+          case parseTerm exampleProgramQ8 of
             Nothing -> putStrLn "Query Parse Error"
             Just (query, _) -> do
               putStrLn (show clauses)
               case solve db query of
                 Just result -> do
-                  putStrLn (show (term result))
-                  putStrLn (show (bindings result))
-                _ -> putStrLn "not found"
+                  putStrLn $ "\nFound result " ++ (show (term result))
+                _ -> putStrLn "\nNot Found"
 
 
 getAndSolve :: IO ()
@@ -94,7 +110,7 @@ mainFunc
     -- putStrLn (show $ mergeBindings [bindTerm "X" (Atom "person")] [bindTerm "Y" (Atom "thing")])
     -- putStrLn $ show $ substituteTerm ([bindTerm "X" (Atom "person")]) (Compound "parent" [(Variable "X")])
 
-    getAndSolve
+    -- getAndSolve
     parseAndSolve
 
 

@@ -25,7 +25,7 @@ type Bindings = [Binding]
 
 
 instance Show Binding where
-  show b = "{ " ++ (show (name b)) ++ " = " ++ (show (value b)) ++ " }"
+  show b = "\n{ " ++ (show (name b)) ++ " = " ++ (show (value b)) ++ " }"
 
 
 makeDatabase :: [Clause] -> Database
@@ -50,8 +50,8 @@ bindTerm name term
 
 makeResult :: (Term, Bindings) -> Int -> Result
 makeResult (term, bindings) atRule
-  = Result {
-      term = term
+  = trace ("Making Result " ++ (show (substituteTerm bindings term))) $ Result {
+      term = substituteTerm bindings term
     , bindings = bindings
     , atRule = atRule
     }
@@ -78,17 +78,17 @@ mergeBindings (a:as) bs
 
 
 substituteTerm :: Bindings -> Term -> Term
-substituteTerm bs (Compound n terms)
-  = Compound n (map (\t -> substituteTerm bs t) terms)
-substituteTerm bs (Cons t1 t2)
-  = Cons (substituteTerm bs t1) (substituteTerm bs t2)
-substituteTerm bs (Variable n)
-  = findBinding bs n
+substituteTerm bindings (Compound n terms)
+  = Compound n (map (\t -> substituteTerm bindings t) terms)
+substituteTerm bindings (Cons t1 t2)
+  = Cons (substituteTerm bindings t1) (substituteTerm bindings t2)
+substituteTerm bindings (Variable n)
+  = findBinding bindings n
   where
     findBinding [] n = Variable n
-    findBinding (b:bs) n | (name b) == n = value b
+    findBinding (b:bs) n | (name b) == n = substituteTerm bindings (value b)
     findBinding (b:bs) n = findBinding bs n
-substituteTerm bs t
+substituteTerm bindings t
   = t
 
 substituteExpr :: Bindings -> Expr -> Expr
@@ -107,6 +107,10 @@ renameTerm tag t = t
 renameExpr :: String -> Expr -> Expr
 renameExpr tag (Conjunct e1 e2) = Conjunct (renameExpr tag e1) (renameExpr tag e2)
 renameExpr tag (Term t) = Term (renameTerm tag t)
+
+renameClause :: String -> Clause -> Clause
+renameClause tag (Fact t) = Fact (renameTerm tag t)
+renameClause tag (Rule lhs rhs) = Rule (renameTerm tag lhs) (renameExpr tag rhs)
 
 
 unify :: Term -> Term -> Maybe (Term, Bindings)
@@ -129,7 +133,7 @@ unify (Cons a1 a2) (Cons b1 b2)
       (t1, r1) <- unify a1 b1
       (t2, r2) <- unify a2 b2
       nb <- mergeBindings r1 r2
-      return $ (Cons t1 t2, nb)
+      return (Cons t1 t2, nb)
 unify _ _
   = Nothing
 
@@ -146,6 +150,10 @@ unifyList (t1 : ts1) (t2 : ts2)
       (ts, b2) <- unifyList ts1 ts2
       bindings <- mergeBindings b1 b2
       return (t : ts, bindings)
+
+
+debugNothing (Just r) = Just r
+debugNothing Nothing = trace "Fail!" Nothing
 
 
 solve :: Database -> Term -> Maybe Result
@@ -169,7 +177,8 @@ solveFrom db i query
 searchClauses :: Database -> Int -> [Clause] -> Term -> Maybe Result
 searchClauses db i [] query = Nothing
 searchClauses db i (c : cs) query
-  = case solveClause db i c query of
+  = let clause = renameClause (show (iteration db)) c in
+    trace ("Try " ++ (show clause)) $ case solveClause db i clause query of
       Just result -> Just result
       Nothing -> searchClauses db (i + 1) cs query
 
@@ -177,14 +186,14 @@ searchClauses db i (c : cs) query
 solveClause :: Database -> Int -> Clause -> Term -> Maybe Result
 solveClause db i (Fact term) query
   = do
-      r <- unify (renameTerm (show (iteration db)) term) query
-      return $ makeResult r i
+      r <- unify term query
+      return $ trace ("Returning " ++ (show r)) $ makeResult r i
 solveClause db i (Rule lhs rhs) query
   = do
-      (t1, b1) <- unify (renameTerm (show (iteration db)) lhs) query
-      r2 <- solveExpr db 0 (substituteExpr b1 (renameExpr (show (iteration db)) rhs))
+      (t1, b1) <- unify lhs query
+      r2 <- solveExpr db 0 (substituteExpr b1 rhs)
       nb <- mergeBindings b1 (bindings r2)
-      return $ makeResult ((substituteTerm nb t1), nb) i
+      return $ makeResult (t1, nb) i
 
 
 solveExpr :: Database -> Int -> Expr -> Maybe Result
@@ -192,14 +201,15 @@ solveExpr db i (Term t) = solveFrom db i t
 solveExpr db i (Conjunct t1 t2) = solveConjunct db i t1 t2
 
 solveConjunct :: Database -> Int -> Expr -> Expr -> Maybe Result
-solveConjunct db i t1 t2
-  = do
-      r1 <- solveExpr db i t1
-      case solveExpr db 0 (substituteExpr (bindings r1) t2) of
+solveConjunct db i e1 e2
+  = trace ("Do conjunct " ++ (show e1) ++ " and " ++ (show e2)) $ do
+      r1 <- solveExpr db i e1
+      case solveExpr db 0 (substituteExpr (bindings r1) e2) of
         Just r2 ->
           do
             nb <- mergeBindings (bindings r1) (bindings r2)
             return $ makeResult (term r2, nb) (atRule r2)
         Nothing ->
-          solveConjunct db ((atRule r1) + 1) t1 t2
+          -- Backtrack by recursing if e2 didn't unify
+          trace "Backtracking" $ solveConjunct db ((atRule r1) + 1) e1 e2
 
