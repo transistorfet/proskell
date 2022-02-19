@@ -5,7 +5,7 @@ module Builtins
 
 import Tree
 
-checkBuiltin :: Term -> Maybe Term
+checkBuiltin :: Term -> Maybe (Maybe Term)
 checkBuiltin term
   = case term of
       (Atom w) -> runBuiltin w []
@@ -13,12 +13,12 @@ checkBuiltin term
       _ -> Nothing
 
 
-runBuiltin :: String -> [Term] -> Maybe Term
+runBuiltin :: String -> [Term] -> Maybe (Maybe Term)
 runBuiltin name args
   = let fullname = name ++ "/" ++ (show (length args)) in
     let list = filter (\(n, _) -> n == fullname) builtins in
     if length list > 0 then
-      (snd (head list)) args
+      Just $ (snd (head list)) args
     else
       Nothing
 
@@ -47,15 +47,16 @@ builtinGreaterThan args
       (Number a, Number b) -> if a > b then Just (Atom "true") else Nothing
       _ -> Nothing
 
+builtinLessThanEqual :: [Term] -> Maybe Term
+builtinLessThanEqual args
+  = case (head args, head (tail args)) of
+      (Number a, Number b) -> if a <= b then Just (Atom "true") else Nothing
+      _ -> Nothing
+
 builtinGreaterThanEqual :: [Term] -> Maybe Term
 builtinGreaterThanEqual args
   = case (head args, head (tail args)) of
       (Number a, Number b) -> if a >= b then Just (Atom "true") else Nothing
       _ -> Nothing
 
-builtinLessThanEqual :: [Term] -> Maybe Term
-builtinLessThanEqual args
-  = case (head args, head (tail args)) of
-      (Number a, Number b) -> if a <= b then Just (Atom "true") else Nothing
-      _ -> Nothing
 

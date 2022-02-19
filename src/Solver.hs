@@ -50,7 +50,7 @@ bindTerm name term
 
 makeResult :: (Term, Bindings) -> Int -> Result
 makeResult (term, bindings) atRule
-  = trace ("Making Result " ++ (show (substituteTerm bindings term))) $ Result {
+  = Result {
       term = substituteTerm bindings term
     , bindings = bindings
     , atRule = atRule
@@ -114,6 +114,10 @@ renameClause tag (Rule lhs rhs) = Rule (renameTerm tag lhs) (renameExpr tag rhs)
 
 
 unify :: Term -> Term -> Maybe (Term, Bindings)
+unify (Atom "_") t
+  = Just (t, [])
+unify t (Atom "_")
+  = Just (t, [])
 unify (Atom n1) (Atom n2) | n1 == n2
   = Just (Atom n1, [])
 unify (Number n1) (Number n2) | n1 == n2
@@ -165,8 +169,12 @@ solveFrom :: Database -> Int -> Term -> Maybe Result
 solveFrom db i query
   = trace ("Solve " ++ (show query)) $
       case checkBuiltin query of
-        Just t -> printResult $ Just $ makeResult (t, []) i
-        _ -> printResult $ searchClauses (incDatabase db) i (drop i (clauses db)) query
+        -- Builtin found and returned a result
+        Just (Just t) -> printResult $ Just $ makeResult (t, []) i
+        -- Builtin found but returned Nothing
+        Just Nothing -> Nothing
+        -- Builtin not found so try unifying
+        Nothing -> printResult $ searchClauses (incDatabase db) i (drop i (clauses db)) query
   where
     printResult result
       = case result of
@@ -180,14 +188,14 @@ searchClauses db i (c : cs) query
   = let clause = renameClause (show (iteration db)) c in
     trace ("Try " ++ (show clause)) $ case solveClause db i clause query of
       Just result -> Just result
-      Nothing -> searchClauses db (i + 1) cs query
+      Nothing -> searchClauses (incDatabase db) (i + 1) cs query
 
 
 solveClause :: Database -> Int -> Clause -> Term -> Maybe Result
 solveClause db i (Fact term) query
   = do
       r <- unify term query
-      return $ trace ("Returning " ++ (show r)) $ makeResult r i
+      return $ makeResult r i
 solveClause db i (Rule lhs rhs) query
   = do
       (t1, b1) <- unify lhs query
@@ -203,13 +211,13 @@ solveExpr db i (Conjunct t1 t2) = solveConjunct db i t1 t2
 solveConjunct :: Database -> Int -> Expr -> Expr -> Maybe Result
 solveConjunct db i e1 e2
   = trace ("Do conjunct " ++ (show e1) ++ " and " ++ (show e2)) $ do
-      r1 <- solveExpr db i e1
-      case solveExpr db 0 (substituteExpr (bindings r1) e2) of
+      r1 <- trace ("Solving first " ++ (show e1)) $ solveExpr db i e1
+      case solveExpr (incDatabase db) 0 (substituteExpr (bindings r1) e2) of
         Just r2 ->
           do
             nb <- mergeBindings (bindings r1) (bindings r2)
             return $ makeResult (term r2, nb) (atRule r2)
         Nothing ->
           -- Backtrack by recursing if e2 didn't unify
-          trace "Backtracking" $ solveConjunct db ((atRule r1) + 1) e1 e2
+          trace ("Backtracking from " ++ (show (substituteExpr (bindings r1) e2)) ++ " to " ++ (show e1)) $ solveConjunct db ((atRule r1) + 1) e1 e2
 

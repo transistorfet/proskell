@@ -1,5 +1,13 @@
 module Lib
   ( mainFunc
+  , parsePair
+  , parseTerm
+  , parseAndSolve
+  , solve
+  , makeDatabase
+  , Result
+  , term
+  , bindings
   ) where
 
 import Tree
@@ -62,13 +70,14 @@ exampleProgramQ6 = "highest(X, [1, 8, 904, 234, 42])."
 exampleProgram7 = "\
 \    append([], Ys, Ys).\n\
 \    append([X|Xs], Ys, [X|Zs]) :- append(Xs, Ys, Zs).\n\
-\    pivot(X, [], [], []).\n\
+\    pivot(_, [], [], []).\n\
 \    pivot(Pivot, [Head|Tail], [Head|LessOrEqualThan], GreaterThan) :- Pivot >= Head, pivot(Pivot, Tail, LessOrEqualThan, GreaterThan).\n\
 \    pivot(Pivot, [Head|Tail], LessOrEqualThan, [Head|GreaterThan]) :- pivot(Pivot, Tail, LessOrEqualThan, GreaterThan).\n\
 \    quicksort([], []).\n\
 \    quicksort([Head|Tail], Sorted) :- pivot(Head, Tail, List1, List2), quicksort(List1, SortedList1), quicksort(List2, SortedList2), append(SortedList1, [Head|SortedList2], Sorted).\n"
 
 exampleProgramQ7 = "quicksort([1, 8, 904, 234, 42], Sorted)."
+--exampleProgramQ7 = "quicksort([1, 8, 904, 234, 42], Sorted)."
 
 exampleProgram8 = "\
 \        append([], Ys, Ys).\n\
@@ -77,40 +86,32 @@ exampleProgram8 = "\
 exampleProgramQ8 = "append([thing, stuff, cat], [more, cat, stuff], Zs)."
 
 
-parseAndSolve :: IO ()
-parseAndSolve
-  = case parseClauseList exampleProgram8 of
-      Nothing -> putStrLn "Parse Error"
-      Just clauses ->
-        let db = makeDatabase clauses in
-          case parseTerm exampleProgramQ8 of
-            Nothing -> putStrLn "Query Parse Error"
-            Just (query, _) -> do
-              putStrLn (show clauses)
-              case solve db query of
-                Just result -> do
-                  putStrLn $ "\nFound result " ++ (show (term result))
-                _ -> putStrLn "\nNot Found"
+printResult :: Maybe Result -> IO ()
+printResult result
+  = case result of
+      Just result -> do
+        putStrLn $ "\nFound result " ++ (show (term result))
+      Nothing -> putStrLn "\nNot Found"
 
 
-getAndSolve :: IO ()
-getAndSolve
-  = let db = makeDatabase exampleProgram1 in
-      let query = exampleProgramQ1 in
-      case solve db query of
-        Just result -> do
-          putStrLn (show (term result))
-          putStrLn (show (bindings result))
-        _ -> putStrLn "not found"
+parsePair :: String -> String -> Maybe ([Clause], Term)
+parsePair clausesStr queryStr
+  = do
+      clauses <- parseClauseList clausesStr
+      (query, remain) <- parseTerm queryStr
+      return (clauses, query)
+
+
+parseAndSolve :: String -> String -> IO ()
+parseAndSolve clausesStr queryStr
+  = case parsePair clausesStr queryStr of
+      Just (clauses, query) -> printResult $ solve (makeDatabase clauses) query
+      Nothing -> putStrLn "Parse error"
+
 
 mainFunc :: IO ()
 mainFunc
   = do
-    -- putStrLn (show exampleProgram)
-    -- putStrLn (show $ mergeBindings [bindTerm "X" (Atom "person")] [bindTerm "Y" (Atom "thing")])
-    -- putStrLn $ show $ substituteTerm ([bindTerm "X" (Atom "person")]) (Compound "parent" [(Variable "X")])
-
-    -- getAndSolve
-    parseAndSolve
+      parseAndSolve exampleProgram7 exampleProgramQ7
 
 

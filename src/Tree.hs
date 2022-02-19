@@ -7,6 +7,7 @@ data Term =
   | Number Int
   | EmptyList
   | Cons Term Term
+  deriving (Eq)
 
 data Expr =
     Term Term
