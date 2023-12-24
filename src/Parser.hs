@@ -1,6 +1,7 @@
 module Parser where
 
 import Debug.Trace
+import Data.Char
 
 import Tree
 
@@ -18,17 +19,9 @@ data Token
   deriving (Eq)
 
 
-isNumber :: Char -> Bool
-isNumber c
-  = c >= '0' && c <= '9'
-
-isUpperCase :: Char -> Bool
-isUpperCase c
-  = c >= 'A' && c <= 'Z'
-
 isWord :: Char -> Bool
 isWord c
-  = c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_'
+  = isAsciiUpper c || isAsciiLower c || isDigit c || c == '_'
 
 isOperator :: Char -> Bool
 isOperator c
@@ -60,7 +53,7 @@ getToken (c:cs)
       '|' -> Just (VerticalBar, cs)
       ',' -> Just (Comma, cs)
       '.' -> Just (Period, cs)
-      ':' -> if (head cs) == '-' then Just (Horn, (tail cs)) else Nothing
+      ':' -> if head cs == '-' then Just (Horn, tail cs) else Nothing
       '%' ->
         let (_, remain) = takeUntil (\c -> c /= '\n') cs
         in getToken remain
@@ -110,8 +103,8 @@ parseTerm input
           (rhs, remain) <- parseTerm remain
           return (Compound operator [term, rhs], remain)
         Nothing -> return (term, remain)
-  where
 
+  where
     parseToken token remain =
       case token of
         Word w -> do
@@ -120,10 +113,10 @@ parseTerm input
             do
               (list, remain) <- parseTermList next_rem
               remain <- expectToken CloseBracket remain
-              return $ (Compound w list, remain)
-          else if isNumber (head w) then
+              return (Compound w list, remain)
+          else if isDigit (head w) then
             Just (Number (read w :: Int), remain)
-          else if isUpperCase (head w) then
+          else if isAsciiUpper (head w) then
             Just (Variable w, remain)
           else
             Just (Atom w, remain)
@@ -143,7 +136,7 @@ parseTermList input
       case expectToken Comma remain of
         Just remain -> do
           (list, remain) <- parseTermList remain
-          return $ (term:list, remain)
+          return (term:list, remain)
         Nothing ->
           Just ([term], remain)
 
@@ -156,9 +149,9 @@ parseExpr input
       case expectToken Comma remain of
         Just remain -> do
           (rhs, next_remain) <- parseExpr remain
-          return $ (Conjunct (Term term) rhs, next_remain)
+          return (Conjunct (Term term) rhs, next_remain)
         Nothing ->
-          return $ (Term term, remain)
+          return (Term term, remain)
 
 
 parseClause :: String -> Maybe (Clause, String)
@@ -167,11 +160,11 @@ parseClause input
       (term, remain1) <- parseTerm input
       case getToken remain1 of
         Just (Period, remain2) ->
-          return $ (Fact term, remain2)
+          return (Fact term, remain2)
         Just (Horn, remain2) -> do
           (rhs, remain3) <- parseExpr remain2
           remain4 <- expectToken Period remain3
-          return $ (Rule term rhs, remain4)
+          return (Rule term rhs, remain4)
         _ ->
           Nothing
 

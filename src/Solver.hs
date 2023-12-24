@@ -25,7 +25,7 @@ type Bindings = [Binding]
 
 
 instance Show Binding where
-  show b = "\n{ " ++ (show (name b)) ++ " = " ++ (show (value b)) ++ " }"
+  show b = "\n{ " ++ show (name b) ++ " = " ++ show (value b) ++ " }"
 
 
 makeDatabase :: [Clause] -> Database
@@ -38,7 +38,7 @@ makeDatabase clauses
 incDatabase :: Database -> Database
 incDatabase db
   = db {
-      iteration = (iteration db) + 1
+      iteration = iteration db + 1
     }
 
 bindTerm :: String -> Term -> Binding

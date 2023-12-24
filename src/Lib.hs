@@ -90,7 +90,7 @@ printResult :: Maybe Result -> IO ()
 printResult result
   = case result of
       Just result -> do
-        putStrLn $ "\nFound result " ++ (show (term result))
+        putStrLn $ "\nFound result " ++ (emit (term result))
       Nothing -> putStrLn "\nNot Found"
 
 
@@ -112,6 +112,6 @@ parseAndSolve clausesStr queryStr
 mainFunc :: IO ()
 mainFunc
   = do
-      parseAndSolve exampleProgram7 exampleProgramQ7
+      parseAndSolve exampleProgram8 exampleProgramQ8
 
 
